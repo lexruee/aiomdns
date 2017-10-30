@@ -3,7 +3,6 @@
 __author__ = 'Alexander Rüedlinger'
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('aiomdns')
 
 import socket
@@ -35,13 +34,13 @@ class ServerProtocol(asyncio.DatagramProtocol):
 
 class Server(object):
 
-    def __init__(self, loop):
+    def __init__(self, loop, ipv4_socket=None, ipv6_socket=None):
         self._loop = loop
         self._hosts = [];
 
         # create sockets 
-        ipv4_socket = create_socket_ipv4()
-        ipv6_socket = create_socket_ipv6()
+        ipv4_socket = ipv4_socket or create_socket_ipv4()
+        ipv6_socket = ipv6_socket or create_socket_ipv6()
        
         # create datagram endpoints
         handler = self._datagram_received
