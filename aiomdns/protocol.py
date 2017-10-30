@@ -2,6 +2,9 @@
 
 __author__ = 'Alexander Rüedlinger'
 
+import logging
+logger = logging.getLogger('aiomdns')
+
 import io
 import struct
 import binascii

@@ -3,4 +3,6 @@
 __author__ = 'Alexander Rüedlinger'
 __all__ = ()
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
