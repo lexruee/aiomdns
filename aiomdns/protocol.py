@@ -2,6 +2,7 @@
 
 __author__ = 'Alexander Rüedlinger'
 
+import io
 import struct
 import binascii
 import sys
@@ -744,6 +745,10 @@ class Message(Base):
             self._additional_rrs.append(self._unpack_record(stream))
 
         return self
+
+    def parse(self, data):
+        stream = io.BytesIO(data)
+        self.unpack(stream)
 
     def __str__(self):
         return '<Message(\n  {}\n{}\n)>'\
