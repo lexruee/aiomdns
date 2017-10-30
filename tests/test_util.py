@@ -7,10 +7,7 @@ import sys
 def test_unhexlify_string():
     hexstr = '00 84'
     data = util.unhexlify_string(hexstr)
-    if sys.version_info < (3, 0):
-        assert data == '\x00\x84'
-    else:
-        assert data == b'\x00\x84'
+    assert data == b'\x00\x84'
 
 
 def test_py3_labels_to_string():
