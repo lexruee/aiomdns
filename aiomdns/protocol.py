@@ -5,11 +5,31 @@ __author__ = 'Alexander Rüedlinger'
 import struct
 import binascii
 import sys
+import socket
 from . import util
 
 MDNS_UDP_PORT = 5353
 MDNS_MULTICAST_ADDR_IPv4 = '224.0.0.251'
 MDNS_MULTICAST_ADDR_IPv6 = 'FF02::FB'
+
+def create_socket_ipv4(interface='0.0.0.0'):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(('', MDNS_UDP_PORT))
+    group = socket.inet_aton(MDNS_MULTICAST_ADDR_IPv4)
+    mreq = group + socket.inet_aton(interface)
+    sock.setsockopt(socket.SOL_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+    return sock
+
+def create_socket_ipv6(interface='0.0.0.0'):
+    sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(('', MDNS_UDP_PORT))
+    group = socket.inet_pton(socket.AF_INET6, MDNS_MULTICAST_ADDR_IPv6)
+    mreq = group + socket.inet_aton(interface)
+    sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
+    return sock
+
 
 # TYPE value and meaning
 MDNS_TYPE_A = 0x0001        # an IPv4 host address
