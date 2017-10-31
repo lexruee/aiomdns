@@ -146,6 +146,7 @@ class Header(Base):
     """
 
     HEADER_FORMAT = '>HHHHHH'
+    SIZE = 12
 
     def __init__(self, id=0, flags=0, qd_count=0, an_count=0, ns_count=0, ar_count=0):
         self._id = id  # this field identifies a specific DNS transaction
@@ -155,6 +156,9 @@ class Header(Base):
         self._ns_count = ns_count  # this field defines the number of name server in the authority RRs section
         self._ar_count = ar_count  # this field defines the number of additionals in the additional RRs section
 
+    def size(self):
+        return self.SIZE
+
     def unpack(self, stream):
         data = stream.read(12)  # header is 12 bytes long
         self._id, self._flags, self._qd_count, self._an_count, self._ns_count, self._ar_count = \
@@ -162,7 +166,13 @@ class Header(Base):
         return self
 
     def pack(self):
-        return None
+        byte_data = struct.pack(self.HEADER_FORMAT, self._id, self._flags, self._qd_count, self._an_count,
+                                self._ns_count, self._ar_count)
+        return byte_data
+
+    def pack_into(self, buffer, offset=0):
+        struct.pack_into(self.HEADER_FORMAT, buffer, offset, self._id, self._flags, self._qd_count, self._an_count,
+                         self._ns_count, self._ar_count)
 
     def id(self, id=None):
         if id:
