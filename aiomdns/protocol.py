@@ -60,24 +60,90 @@ find_pos = util.py3_find_pos
 labels_to_string = util.py3_labels_to_string
 
 
-class ParsingError(Exception):
+class PackingError(Exception):
     pass
 
 
-class EncodingError(Exception):
+class UnpackingError(Exception):
     pass
 
 
-class Base(object):
+class Packable(object):
+
+    UTF8 = 'utf-8'
+    DOT = '.'
+
+    def __init__(self):
+        self._names = {}
+        self._offset = 0
+        self._obuf = bytearray()
+
+    def offset(self):
+        raise self._offset
 
     def pack(self):
         raise NotImplementedError
+
+    def _write_string(self, value):
+        _bytes = bytes(value)
+        self._obuf.extend(_bytes)
+        self._offset += len(_bytes)
+
+    def _write_utf_string(self, value):
+        utf_label = value.encode(self.UTF8)
+        self._write_byte(len(utf_label))
+        self._write_string(utf_label)
+
+    def _write_byte(self, value):
+        self._obuf.append(value)
+        self._offset += 1
+
+    def _write_ushort(self, value):
+        self._obuf.extend(struct.pack('>H', value))
+        self._offset += 2
+
+    def _write_uint(self, value):
+        self._obuf.extend(struct.pack('>I', value))
+        self._offset += 4
+
+    def _write_name(self, name):
+        labels = name.split(self.DOT)
+        if not labels[-1]:  # if a string ends with '.'
+            labels.pop()
+
+        subnames = ['.'.join(labels[i:]) for i in range(len(labels))]
+        count = 0
+        for subname in subnames:
+            if subname not in self._names:
+                break
+            count += 1
+
+        self._names = {subname: self._offset + len(name) - len(subname) - 1 for subname in subnames[:count]}
+
+        for label in labels[:count]:
+            self._write_utf_string(label)
+
+        if count != len(subnames):
+            index = self._names[subnames[count]]
+            self._write_byte((index >> 8) | 0xc0)
+            self._write_byte(index & 0xff)
+        else:
+            self._write_byte(0)
+
+    def _pack_label(self, label):
+        utf_label = label.encode('utf-8')
+        len = len(utf_label)
+        if len > 64:
+            raise PackingError("Label too long (> 64)")
+
+
+class Unpackable(object):
 
     def unpack(self, stream):
         raise NotImplementedError
 
     @staticmethod
-    def _unpack_name(stream):
+    def _read_name(stream):
         labels, next = [], -1
         offset = first = stream.tell()
 
@@ -103,11 +169,11 @@ class Base(object):
                 offset = ((label_len & 0x3f) << 8) | to_int(stream.read(1))
 
                 if offset >= first:
-                    raise ParsingError("Bad domain name")
+                    raise UnpackingError("Bad domain name")
 
                 first = offset
             else:
-                raise ParsingError("Bad domain name")
+                raise UnpackingError("Bad domain name")
 
         if next >= 0:
             stream.seek(next)
@@ -117,11 +183,11 @@ class Base(object):
         return labels_to_string(labels)
 
     @staticmethod
-    def _unpack_string(stream, length):
+    def _read_string(stream, length):
         return struct.unpack('>{}c'.format(length), stream.read(length))
 
 
-class Header(Base):
+class Header(Unpackable, Packable):
     """
     Representation of a DNS header.
     According to rfc1035, the header contains the following fields:
@@ -263,7 +329,7 @@ class Header(Base):
     __repr__ = __str__
 
 
-class Question(Base):
+class Question(Unpackable, Packable):
     """
     Representation of a question section.
     The question section format is defined as follows:
@@ -292,7 +358,7 @@ class Question(Base):
         return None
 
     def unpack(self, stream):
-        self._qname = self._unpack_name(stream)
+        self._qname = self._read_name(stream)
         self._qtype, self._qclass = struct.unpack(self.FORMAT, stream.read(4))
         return self
 
@@ -317,7 +383,7 @@ class Question(Base):
     __repr__ = __str__
 
 
-class Record(Base):
+class Record(Unpackable, Packable):
     """
     Representation of a record.
     The resource record format is defined as follows:
@@ -381,7 +447,7 @@ class Record(Base):
         self._cache_flush = 0
 
     def unpack(self, stream):
-        self._rname = self._unpack_name(stream)
+        self._rname = self._read_name(stream)
         self._rtype, self._rclass, self._ttl, self._rdlength =\
             struct.unpack(self.FORMAT, stream.read(10))
 
@@ -471,7 +537,7 @@ class SRVRecord(Record):
         self._priority, self._weight, self._port = struct.unpack(self.RDATA_FORMAT, self._rdata[0:6])
         offset = stream.tell()
         stream.seek(offset-self._rdlength+6)
-        self._target = self._unpack_name(stream)
+        self._target = self._read_name(stream)
         print(self._target)
         stream.seek(offset)
         return self
@@ -612,7 +678,7 @@ class PTRRecord(Record):
         super(PTRRecord, self).unpack(stream)
         offset = stream.tell()
         stream.seek(offset-self._rdlength)
-        self._ptrdname = self._unpack_name(stream)
+        self._ptrdname = self._read_name(stream)
         stream.seek(offset)
         return self
 
@@ -663,7 +729,7 @@ class TXTRecord(Record):
         return self._txt_data
 
 
-class Message(Base):
+class Message(Unpackable, Packable):
     """
     Representation of a DNS message,
     Following the rfc1035, the dns message format is divided into 5 sections, as shown below:
