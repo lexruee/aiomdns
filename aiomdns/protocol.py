@@ -68,7 +68,7 @@ class UnpackingError(Exception):
     pass
 
 
-class Packable(object):
+class PackableMixin(object):
 
     UTF8 = 'utf-8'
     DOT = '.'
@@ -137,7 +137,7 @@ class Packable(object):
             raise PackingError("Label too long (> 64)")
 
 
-class Unpackable(object):
+class UnpackableMixin(object):
 
     def unpack(self, stream):
         raise NotImplementedError
@@ -187,7 +187,7 @@ class Unpackable(object):
         return struct.unpack('>{}c'.format(length), stream.read(length))
 
 
-class Header(Unpackable, Packable):
+class Header(UnpackableMixin, PackableMixin):
     """
     Representation of a DNS header.
     According to rfc1035, the header contains the following fields:
@@ -329,7 +329,7 @@ class Header(Unpackable, Packable):
     __repr__ = __str__
 
 
-class Question(Unpackable, Packable):
+class Question(UnpackableMixin, PackableMixin):
     """
     Representation of a question section.
     The question section format is defined as follows:
@@ -383,7 +383,7 @@ class Question(Unpackable, Packable):
     __repr__ = __str__
 
 
-class Record(Unpackable, Packable):
+class Record(UnpackableMixin, PackableMixin):
     """
     Representation of a record.
     The resource record format is defined as follows:
@@ -729,7 +729,7 @@ class TXTRecord(Record):
         return self._txt_data
 
 
-class Message(Unpackable, Packable):
+class Message(UnpackableMixin, PackableMixin):
     """
     Representation of a DNS message,
     Following the rfc1035, the dns message format is divided into 5 sections, as shown below:
